@@ -1,0 +1,148 @@
+# Chart CI — Helm lint, ct lint, kubeconform, secrets scan
+#
+# Trigger: every PR; push to main.
+#
+# Chart-specific jobs (helm lint, ct lint, kubeconform) are guarded so they
+# skip cleanly until the first Chart.yaml lands. Once a chart exists under
+# charts/, the jobs activate automatically.
+#
+# Secrets scan (gitleaks) runs unconditionally.
+
+name: Chart CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  KUBECONFORM_VERSION: "0.6.7"
+  K8S_VERSION: "1.32.0"
+  CHART_TESTING_VERSION: "v3.11.0"
+  HELM_VERSION: "v3.16.2"
+
+jobs:
+  detect-charts:
+    name: Detect chart presence
+    runs-on: ubuntu-latest
+    outputs:
+      has_charts: ${{ steps.detect.outputs.has_charts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect Chart.yaml
+        id: detect
+        run: |
+          if compgen -G "charts/*/Chart.yaml" > /dev/null; then
+            echo "has_charts=true" >> $GITHUB_OUTPUT
+            echo "Found Chart.yaml — chart jobs will run"
+          else
+            echo "has_charts=false" >> $GITHUB_OUTPUT
+            echo "No Chart.yaml — chart jobs will skip"
+          fi
+
+  helm-lint:
+    name: helm lint
+    runs-on: ubuntu-latest
+    needs: detect-charts
+    if: needs.detect-charts.outputs.has_charts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Run helm lint on every chart
+        run: |
+          set -e
+          for chart in charts/*/; do
+            echo "::group::helm lint $chart"
+            helm lint "$chart"
+            echo "::endgroup::"
+          done
+
+  ct-lint:
+    name: ct lint
+    runs-on: ubuntu-latest
+    needs: detect-charts
+    if: needs.detect-charts.outputs.has_charts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          version: ${{ env.CHART_TESTING_VERSION }}
+
+      - name: Run ct lint
+        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --chart-dirs charts
+
+  kubeconform:
+    name: kubeconform (k8s ${{ env.K8S_VERSION }})
+    runs-on: ubuntu-latest
+    needs: detect-charts
+    if: needs.detect-charts.outputs.has_charts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${{ env.KUBECONFORM_VERSION }}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: helm template | kubeconform
+        run: |
+          set -e
+          for chart in charts/*/; do
+            chart_name=$(basename "$chart")
+            echo "::group::$chart_name"
+            helm template "$chart_name" "$chart" \
+              | kubeconform \
+                  -strict \
+                  -summary \
+                  -kubernetes-version ${{ env.K8S_VERSION }} \
+                  -schema-location default \
+                  -schema-location "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+            echo "::endgroup::"
+          done
+
+  gitleaks:
+    name: gitleaks (secrets scan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
