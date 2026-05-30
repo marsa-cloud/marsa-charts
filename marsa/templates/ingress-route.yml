@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: marsa-ingress-route
+  namespace: {{ .Values.namespace }}
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+  {{- with .Values.tls.domain }}
+  - match: Host(`{{ . }}`)
+    kind: Rule
+    services:
+    - name: marsa-web
+      port: 80
+  - match: Host(`api.{{ . }}`)
+    kind: Rule
+    services:
+    - name: marsa-api
+      port: 3000
+  {{- end }}
+  - match: PathPrefix(`/`)
+    kind: Rule
+    services:
+    - name: marsa-web
+      port: 80

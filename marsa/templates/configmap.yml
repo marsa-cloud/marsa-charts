@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: {{ .Values.namespace }}
+data:
+  init.sql: |
+    CREATE DATABASE marsa;
+    CREATE USER marsa WITH PASSWORD '{{ .Values.postgres.marsaUserPassword }}';
+    GRANT ALL PRIVILEGES ON DATABASE marsa TO marsa;

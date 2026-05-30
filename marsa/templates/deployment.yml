@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marsa-web
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: marsa-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marsa-web
+  template:
+    metadata:
+      namespace: {{ .Values.namespace }}
+      labels:
+        app: marsa-web
+    spec:
+      containers:
+      - name: marsa-web
+        image: ghcr.io/marsa-cloud/marsa-web:latest
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marsa-api
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: marsa-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marsa-api
+  template:
+    metadata:
+      namespace: {{ .Values.namespace }}
+      labels:
+        app: marsa-api
+    spec:
+      containers:
+      - name: marsa-api
+        image: ghcr.io/marsa-cloud/marsa-api:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DATABASE_URL
+          value: "postgresql://marsa:{{ .Values.postgres.marsaUserPassword }}@postgres:5432/marsa"
+        - name: DB_NAME
+          value: "marsa"

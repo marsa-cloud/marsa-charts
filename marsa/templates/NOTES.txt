@@ -1,0 +1,4 @@
+Marsa has been installed successfully!
+
+To access the application, please use the following URL:
+http://{{ .Values.tls.domain }}

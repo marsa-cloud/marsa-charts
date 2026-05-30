@@ -1,0 +1,8 @@
+namespace: "marsa"
+postgres:
+  marsaUserPassword: "marsa-password"
+  adminPassword: "postgres-admin-password"
+  storageSize: "2Gi"
+tls:
+  enabled: false
+  domain: "example.com"
