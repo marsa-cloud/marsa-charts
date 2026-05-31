@@ -153,7 +153,7 @@ jobs:
           set -e
           for chart in charts/*/; do
             echo "::group::helm unittest $chart"
-            docker run --rm -v "$PWD:/apps" helmunittest/helm-unittest:latest "$chart"
+            docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/apps" helmunittest/helm-unittest:latest "$chart"
             echo "::endgroup::"
           done
 
