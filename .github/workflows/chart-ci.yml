@@ -151,7 +151,7 @@ jobs:
           version: ${{ env.HELM_VERSION }}
 
       - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest
 
       - name: Run helm unittest on every chart
         run: |
@@ -171,7 +171,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      # The gitleaks BINARY is open-source (Apache-2.0); only the
+      # gitleaks-action wrapper requires a paid licence on org-owned repos.
+      # Run the binary directly to keep the scan free + unauthenticated.
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.18.4"
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Run gitleaks
+        run: gitleaks detect --source . --no-git --redact --verbose
