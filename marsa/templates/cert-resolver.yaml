@@ -2,8 +2,8 @@
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
-  name: traefik
-  namespace: kube-system
+  name: traefik-cert-resolver
+  namespace: {{ .Values.namespace }}
 spec:
   valuesContent: |-
     additionalArguments:
