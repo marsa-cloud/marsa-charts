@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: marsa-web
-        image: "{{ .Values.image.web.repository }}:{{ .Values.image.web.tag | default .Chart.AppVersion }}"
+        image: "ghcr.io/marsa-cloud/marsa-web:{{ .Values.image.tag | default .Chart.AppVersion }}"
         ports:
         - containerPort: 80
 
@@ -39,17 +39,13 @@ spec:
     spec:
       containers:
       - name: marsa-api
-        image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag | default .Chart.AppVersion }}"
+        image: "ghcr.io/marsa-cloud/marsa-api:{{ .Values.image.tag | default .Chart.AppVersion }}"
         ports:
         - containerPort: 3000
-        # Non-secret config (NODE_ENV, DB_NAME) from the ConfigMap.
         envFrom:
         - configMapRef:
             name: marsa-config
         env:
-        # Password comes from the Secret, never the manifest. Kubernetes
-        # resolves $(MARSA_PASSWORD) from the env var above it, so the
-        # plaintext password never appears in the rendered Deployment.
         - name: MARSA_PASSWORD
           valueFrom:
             secretKeyRef:

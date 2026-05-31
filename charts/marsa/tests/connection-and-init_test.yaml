@@ -42,7 +42,8 @@ tests:
     documentIndex: 1
     set:
       # even with an explicit password set, it must NOT appear in the manifest
-      postgres.marsaUserPassword: super-secret-pinned-pw
+      # (alphanumeric per the values.schema.json charset constraint)
+      postgres.marsaUserPassword: supersecretpinnedpw
     asserts:
       - equal:
           path: metadata.name
@@ -63,7 +64,7 @@ tests:
       # the plaintext password must never be rendered into the Deployment
       - notMatchRegex:
           path: spec.template.spec.containers[0].env[1].value
-          pattern: "super-secret-pinned-pw"
+          pattern: "supersecretpinnedpw"
 
   - it: marsa-api pulls non-secret config from the marsa-config ConfigMap
     template: templates/deployment.yml

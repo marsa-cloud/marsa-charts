@@ -9,11 +9,12 @@
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["web", "api"],
-      "description": "Container images for the Marsa app. tag defaults to .Chart.AppVersion when blank.",
+      "description": "Image tag for the Marsa app images (web + api). Blank defaults to .Chart.AppVersion.",
       "properties": {
-        "web": { "$ref": "#/definitions/imageRef" },
-        "api": { "$ref": "#/definitions/imageRef" }
+        "tag": {
+          "type": "string",
+          "description": "Tag applied to both marsa-web and marsa-api. Blank defaults to the chart's appVersion."
+        }
       }
     },
     "email": {
@@ -30,11 +31,13 @@
       "properties": {
         "marsaUserPassword": {
           "type": "string",
-          "description": "Password for the marsa DB role. Blank = auto-generate on first install and persist in the postgres-secrets Secret (reused on upgrade). Set only to pin a password on first install."
+          "pattern": "^[A-Za-z0-9]*$",
+          "description": "Password for the marsa DB role. Alphanumeric only — it is interpolated into a single-quoted SQL literal and into DATABASE_URL, so quotes/@/: would break them. Blank = auto-generate on first install and persist in the postgres-secrets Secret (reused on upgrade). Set only to pin a password on first install."
         },
         "adminPassword": {
           "type": "string",
-          "description": "Password for the postgres superuser. Blank = auto-generate on first install. Same generate-once/reuse semantics as marsaUserPassword."
+          "pattern": "^[A-Za-z0-9]*$",
+          "description": "Password for the postgres superuser. Alphanumeric only (same SQL/URL-safety reason as marsaUserPassword). Blank = auto-generate on first install. Same generate-once/reuse semantics."
         },
         "storageSize": {
           "type": "string",
@@ -57,24 +60,6 @@
           "description": "Public domain Marsa is served on. Required — it drives the IngressRoute Host rules (web on <domain>, api on api.<domain>) whether or not TLS is enabled.",
           "minLength": 1,
           "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)+[a-z]{2,}$"
-        }
-      }
-    }
-  },
-  "definitions": {
-    "imageRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["repository"],
-      "properties": {
-        "repository": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Image repository (without tag), e.g. ghcr.io/marsa-cloud/marsa-web."
-        },
-        "tag": {
-          "type": "string",
-          "description": "Image tag. Blank defaults to the chart's appVersion."
         }
       }
     }

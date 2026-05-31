@@ -1,14 +1,9 @@
 email: "your-email@example.com"
-# Container images. tag defaults to the chart's appVersion (see AgDR-0002 —
-# image tags track the marsa release the chart packages). Override tag only
-# if the appVersion-tagged image isn't published yet (e.g. set to "latest").
+# Image tag for both marsa-web and marsa-api (they release together). Blank
+# defaults to the chart's appVersion (see AgDR-0002). Override only if the
+# appVersion-tagged image isn't published yet (e.g. set to "latest").
 image:
-  web:
-    repository: "ghcr.io/marsa-cloud/marsa-web"
-    tag: ""
-  api:
-    repository: "ghcr.io/marsa-cloud/marsa-api"
-    tag: ""
+  tag: ""
 postgres:
   # Passwords are auto-generated on first install and persisted in the
   # `postgres-secrets` Secret; subsequent upgrades reuse the stored values
