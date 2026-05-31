@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marsa-web
+  labels:
+    app: marsa-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marsa-web
+  template:
+    metadata:
+      labels:
+        app: marsa-web
+    spec:
+      containers:
+      - name: marsa-web
+        image: "{{ .Values.image.web.repository }}:{{ .Values.image.web.tag | default .Chart.AppVersion }}"
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marsa-api
+  labels:
+    app: marsa-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marsa-api
+  template:
+    metadata:
+      labels:
+        app: marsa-api
+    spec:
+      containers:
+      - name: marsa-api
+        image: "{{ .Values.image.api.repository }}:{{ .Values.image.api.tag | default .Chart.AppVersion }}"
+        ports:
+        - containerPort: 3000
+        # Non-secret config (NODE_ENV, DB_NAME) from the ConfigMap.
+        envFrom:
+        - configMapRef:
+            name: marsa-config
+        env:
+        # Password comes from the Secret, never the manifest. Kubernetes
+        # resolves $(MARSA_PASSWORD) from the env var above it, so the
+        # plaintext password never appears in the rendered Deployment.
+        - name: MARSA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: MARSA_PASSWORD
+        - name: DATABASE_URL
+          value: "postgresql://marsa:$(MARSA_PASSWORD)@postgres:5432/marsa"

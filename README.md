@@ -25,8 +25,13 @@ Other Kubernetes distributions may work but are not validated. See the AgDR link
 > **Status: coming with v0.1.0.** The first chart is not yet published. The install command below documents the planned UX.
 
 ```bash
-helm install marsa oci://ghcr.io/marsa-cloud/charts/marsa --version 0.1.0
+helm install marsa oci://ghcr.io/marsa-cloud/charts/marsa --version 0.1.0 \
+  --namespace marsa --create-namespace \
+  --set tls.domain=marsa.example.com \
+  --set email=you@example.com
 ```
+
+The chart installs into the release namespace (`--namespace` / `--create-namespace`); it does not create a Namespace of its own. `tls.domain` is required (it drives the ingress routing); `email` is used for Let's Encrypt registration when `tls.enabled` (the default).
 
 Requires **Helm 3.8+** (released March 2022) for native OCI registry support. There is no `helm repo add` step — charts are pulled directly from GitHub Container Registry.
 
@@ -36,19 +41,20 @@ The v0.1 chart packages all of Marsa's required infrastructure so a single `helm
 
 | Component | Version | How |
 |-----------|---------|-----|
-| Marsa application | `appVersion` from `Chart.yaml` | Templates in this repo |
-| **Postgres** | `postgres:18.3-alpine` | Bundled — StatefulSet with PVC, init script creates the `marsa` database + user; generated passwords stored in a Kubernetes Secret and persisted across upgrades |
-| **Redis** | `redis:7-alpine` | Bundled — Deployment with PVC for AOF persistence |
-| **Ingress** | K3s built-in **Traefik** | Not bundled — the chart's `Ingress` resource uses Traefik's default ingressClassName |
+| Marsa application | `appVersion` from `Chart.yaml` | `marsa-web` + `marsa-api` Deployments; image tags default to `appVersion` |
+| **Postgres** | `postgres:18.3-alpine` | Bundled — StatefulSet with PVC, init script creates the `marsa` database + user (owner); generated passwords stored in a Kubernetes Secret and persisted across upgrades |
+| **Ingress** | K3s built-in **Traefik** | Traefik `IngressRoute` routing web on `<domain>` and api on `api.<domain>` |
+| **TLS** | Let's Encrypt | Public-ingress HTTPS via the K3s Traefik ACME resolver (`tls.enabled`, default on) — see AgDR-0005 |
 
 ## Out of scope (v0.1)
 
 The v0.1 chart deliberately does **not** support these. They are deferred to a later version once real demand is established:
 
-- **Bring-your-own (BYO) Postgres / Redis** — no `externalDatabase.host` / `*.enabled` values
+- **Redis** — Marsa does not use Redis; nothing Redis-related ships (see AgDR-0004 amendment)
+- **Bring-your-own (BYO) Postgres** — no `externalDatabase.host` / `*.enabled` values
 - **Non-Traefik ingress controllers** — no ingressClassName customisation
-- **cert-manager / public-internet TLS** — MVP assumes local-network deployment
-- **High-availability / replication** — single replica per component
+- **In-cluster service-to-service TLS** — marsa↔Postgres stays plaintext on the private network; encrypting it would mean a service mesh (out of scope). Public-ingress HTTPS *is* supported — see AgDR-0005
+- **High-availability / replication** — single replica per component (the Traefik ACME resolver also requires a single Traefik replica)
 - **Multi-node / multi-AZ** — uses `local-path` storage class which is node-local
 - **Public-internet-facing deployments** — not validated
 

@@ -1,0 +1,26 @@
+Marsa {{ .Chart.AppVersion }} has been installed into namespace "{{ .Release.Namespace }}".
+
+{{- $scheme := ternary "https" "http" .Values.tls.enabled }}
+Access the app at:
+
+  Web UI:  {{ $scheme }}://{{ .Values.tls.domain }}
+  API:     {{ $scheme }}://api.{{ .Values.tls.domain }}
+
+{{- if .Values.tls.enabled }}
+
+TLS is enabled via Let's Encrypt (Traefik ACME resolver). On first request the
+certificate can take up to a minute to issue — a browser warning before then is
+expected. Point your DNS at the cluster's ingress node first:
+
+  kubectl get nodes -o wide
+{{- else }}
+
+TLS is disabled — traffic is plain HTTP. Make sure "{{ .Values.tls.domain }}"
+(and "api.{{ .Values.tls.domain }}") resolve to your cluster's ingress node:
+
+  kubectl get nodes -o wide
+{{- end }}
+
+Check the rollout:
+
+  kubectl get pods -n {{ .Release.Namespace }}

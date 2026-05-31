@@ -2,12 +2,15 @@
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
-  name: traefik-cert-resolver
-  namespace: {{ .Values.namespace }}
+  # MUST be name=traefik in namespace=kube-system: K3s applies a HelmChartConfig
+  # only when it matches the bundled `traefik` HelmChart's name + namespace.
+  # A differently-named/namespaced config is silently ignored (this is why the
+  # resolver wasn't taking effect). NOT the release namespace.
+  name: traefik
+  namespace: kube-system
 spec:
   valuesContent: |-
     additionalArguments:
-      - "--log.level=DEBUG"
       - "--certificatesresolvers.le.acme.email={{ .Values.email }}"
       - "--certificatesresolvers.le.acme.storage=/data/acme.json"
       - "--certificatesresolvers.le.acme.tlschallenge=true"

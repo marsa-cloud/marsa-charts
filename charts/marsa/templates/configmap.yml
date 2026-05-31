@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  # Shell init script (not a .sql) so the marsa password is read from the
+  # MARSA_PASSWORD env injected from the postgres-secrets Secret — the Secret
+  # is the single source of truth, so the password is never duplicated into
+  # this ConfigMap. Runs only on first init (empty PGDATA); skipped on upgrade.
+  init.sh: |
+    #!/bin/sh
+    set -e
+    # Create the app role first, then make it the database owner.
+    # On PostgreSQL 15+ the `public` schema is owned by pg_database_owner,
+    # and the database owner inherits that membership — so owning the DB
+    # grants full CREATE rights on `public` with no extra GRANT needed.
+    # (Plain `GRANT ALL PRIVILEGES ON DATABASE` does NOT grant schema CREATE
+    # on PG15+, which would block the app from creating tables.)
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+      CREATE USER marsa WITH PASSWORD '${MARSA_PASSWORD}';
+      CREATE DATABASE marsa OWNER marsa;
+    EOSQL
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marsa-config
+data:
+  # Non-secret app configuration (the password is NOT here — it comes from the
+  # postgres-secrets Secret via secretKeyRef in the Deployment).
+  NODE_ENV: "production"
+  DB_NAME: "marsa"

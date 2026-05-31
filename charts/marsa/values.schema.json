@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Marsa chart values",
+  "description": "Value surface for the Marsa umbrella chart. Bundled-component MVP (Postgres only) per AgDR-0004; public-ingress TLS via Traefik ACME resolver per AgDR-0005. additionalProperties is false at every level so off-happy-path keys (e.g. externalDatabase.host) fail loudly instead of being silently ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["email", "image", "postgres", "tls"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web", "api"],
+      "description": "Container images for the Marsa app. tag defaults to .Chart.AppVersion when blank.",
+      "properties": {
+        "web": { "$ref": "#/definitions/imageRef" },
+        "api": { "$ref": "#/definitions/imageRef" }
+      }
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email for Let's Encrypt ACME registration (expiry notices). Override the placeholder before any public deployment.",
+      "format": "email",
+      "minLength": 1,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storageSize"],
+      "properties": {
+        "marsaUserPassword": {
+          "type": "string",
+          "description": "Password for the marsa DB role. Blank = auto-generate on first install and persist in the postgres-secrets Secret (reused on upgrade). Set only to pin a password on first install."
+        },
+        "adminPassword": {
+          "type": "string",
+          "description": "Password for the postgres superuser. Blank = auto-generate on first install. Same generate-once/reuse semantics as marsaUserPassword."
+        },
+        "storageSize": {
+          "type": "string",
+          "description": "PVC size for the Postgres data volume (Kubernetes quantity, e.g. 2Gi). Immutable after first install — changing it makes helm upgrade fail rather than lose data.",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$"
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "domain"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable public-facing HTTPS via the K3s Traefik Let's Encrypt cert resolver (AgDR-0005)."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Public domain Marsa is served on. Required — it drives the IngressRoute Host rules (web on <domain>, api on api.<domain>) whether or not TLS is enabled.",
+          "minLength": 1,
+          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)+[a-z]{2,}$"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "imageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Image repository (without tag), e.g. ghcr.io/marsa-cloud/marsa-web."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Image tag. Blank defaults to the chart's appVersion."
+        }
+      }
+    }
+  }
+}
