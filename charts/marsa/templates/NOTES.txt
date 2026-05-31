@@ -6,15 +6,18 @@ Access the app at:
   Web UI:  {{ $scheme }}://{{ .Values.tls.domain }}
   API:     {{ $scheme }}://api.{{ .Values.tls.domain }}
 
-Routing is host-based, so "{{ .Values.tls.domain }}" (and
-"api.{{ .Values.tls.domain }}") must resolve to your cluster's ingress node —
-plain http://<node-ip> will NOT reach Marsa without the matching Host header.
+No DNS yet? The web UI is reachable directly by node IP — a catch-all route
+serves marsa-web on any host. The API and the api.<domain> route are host-based,
+so those need the hostnames below to resolve.
 
 Find the node IP:
 
   kubectl get nodes -o wide          # use the EXTERNAL-IP (or INTERNAL-IP on a LAN)
 
-Then point a DNS A record at it, or for a quick local test add to /etc/hosts:
+  http://<node-ip>/                  # web UI works by raw IP
+
+For the full domain experience (and the API), point a DNS A record at that IP,
+or for a quick local test add to /etc/hosts:
 
   <node-ip>  {{ .Values.tls.domain }}  api.{{ .Values.tls.domain }}
 

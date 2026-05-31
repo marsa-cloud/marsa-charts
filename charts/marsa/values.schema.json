@@ -13,7 +13,8 @@
       "properties": {
         "tag": {
           "type": "string",
-          "description": "Tag applied to both marsa-web and marsa-api. Blank defaults to the chart's appVersion."
+          "pattern": "^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$",
+          "description": "Tag applied to both marsa-web and marsa-api. Blank defaults to the chart's appVersion; otherwise must be a valid OCI tag (max 128 chars)."
         }
       }
     },
