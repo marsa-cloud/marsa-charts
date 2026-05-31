@@ -1,0 +1,105 @@
+suite: postgres init + marsa connection-string wiring
+templates:
+  - templates/configmap.yml
+  - templates/secret.yml
+  - templates/deployment.yml
+tests:
+  # ── Postgres init wiring (AgDR-0004 bundled Postgres; #8 grants fix) ──
+  - it: init.sh creates the marsa role and a marsa DB owned by it
+    template: templates/configmap.yml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: postgres-init
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: "CREATE USER marsa WITH PASSWORD"
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: "CREATE DATABASE marsa OWNER marsa;"
+
+  - it: init.sh reads the password from env, never embeds a literal, and drops the ineffective GRANT
+    template: templates/configmap.yml
+    documentIndex: 0
+    asserts:
+      # password comes from the injected env var, not a templated literal
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: "\\$\\{MARSA_PASSWORD\\}"
+      # the PG15+ ineffective grant statement must be gone (regression guard
+      # for #8). Matches an actual `GRANT ... ON DATABASE marsa TO marsa`
+      # statement, not the explanatory comment that mentions the anti-pattern.
+      - notMatchRegex:
+          path: data["init.sh"]
+          pattern: "GRANT ALL PRIVILEGES ON DATABASE marsa TO marsa"
+
+  # ── marsa-api connection-string wiring (the issue's named scenario) ──
+  - it: marsa-api DATABASE_URL interpolates the password from the Secret, not plaintext
+    template: templates/deployment.yml
+    documentIndex: 1
+    set:
+      # even with an explicit password set, it must NOT appear in the manifest
+      # (alphanumeric per the values.schema.json charset constraint)
+      postgres.marsaUserPassword: supersecretpinnedpw
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-api
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DATABASE_URL
+            value: "postgresql://marsa:$(MARSA_PASSWORD)@postgres:5432/marsa"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secrets
+                key: MARSA_PASSWORD
+      # the plaintext password must never be rendered into the Deployment
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].env[1].value
+          pattern: "supersecretpinnedpw"
+
+  - it: marsa-api pulls non-secret config from the marsa-config ConfigMap
+    template: templates/deployment.yml
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: marsa-config
+
+  # ── Secret as single source of truth (#5) ──
+  - it: Secret reuses an explicit password override when provided
+    template: templates/secret.yml
+    documentIndex: 0
+    set:
+      postgres.marsaUserPassword: pinnedpw123
+      postgres.adminPassword: adminpw456
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: stringData.MARSA_PASSWORD
+          value: pinnedpw123
+      - equal:
+          path: stringData.POSTGRES_PASSWORD
+          value: adminpw456
+
+  - it: Secret auto-generates a 24-char alphanumeric password when none is provided
+    template: templates/secret.yml
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: stringData.MARSA_PASSWORD
+          pattern: "^[A-Za-z0-9]{24}$"
+      - matchRegex:
+          path: stringData.POSTGRES_PASSWORD
+          pattern: "^[A-Za-z0-9]{24}$"

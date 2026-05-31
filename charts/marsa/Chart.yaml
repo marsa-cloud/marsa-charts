@@ -1,0 +1,6 @@
+apiVersion: v2
+name: marsa
+description: A Helm chart for Marsa
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,19 @@
+email: "your-email@example.com"
+# Image tag for both marsa-web and marsa-api (they release together). Blank ("")
+# falls back to the chart's appVersion (see AgDR-0002). Pinned to "latest" for now
+# because versioned images aren't published yet — clear back to "" to get
+# appVersion-pinning once the OCI publish pipeline tags releases.
+image:
+  tag: "latest"
+postgres:
+  # Passwords are auto-generated on first install and persisted in the
+  # `postgres-secrets` Secret; subsequent upgrades reuse the stored values
+  # (no rotation — see AgDR-0004). Leave blank for the seamless default.
+  # Set a value here only to pin a specific password on first install; it is
+  # ignored once the Secret already exists.
+  marsaUserPassword: ""
+  adminPassword: ""
+  storageSize: "2Gi"
+tls:
+  enabled: true
+  domain: "marsa.gomaa.ovh"

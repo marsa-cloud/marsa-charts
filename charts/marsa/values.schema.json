@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Marsa chart values",
+  "description": "Value surface for the Marsa umbrella chart. Bundled-component MVP (Postgres only) per AgDR-0004; public-ingress TLS via Traefik ACME resolver per AgDR-0005. additionalProperties is false at every level so off-happy-path keys (e.g. externalDatabase.host) fail loudly instead of being silently ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["email", "image", "postgres", "tls"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Image tag for the Marsa app images (web + api). Blank defaults to .Chart.AppVersion.",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "pattern": "^([A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$",
+          "description": "Tag applied to both marsa-web and marsa-api. Blank defaults to the chart's appVersion; otherwise must be a valid OCI tag (max 128 chars)."
+        }
+      }
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email for Let's Encrypt ACME registration (expiry notices). Override the placeholder before any public deployment.",
+      "format": "email",
+      "minLength": 1,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storageSize"],
+      "properties": {
+        "marsaUserPassword": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]*$",
+          "description": "Password for the marsa DB role. Alphanumeric only — it is interpolated into a single-quoted SQL literal and into DATABASE_URL, so quotes/@/: would break them. Blank = auto-generate on first install and persist in the postgres-secrets Secret (reused on upgrade). Set only to pin a password on first install."
+        },
+        "adminPassword": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]*$",
+          "description": "Password for the postgres superuser. Alphanumeric only (same SQL/URL-safety reason as marsaUserPassword). Blank = auto-generate on first install. Same generate-once/reuse semantics."
+        },
+        "storageSize": {
+          "type": "string",
+          "description": "PVC size for the Postgres data volume (Kubernetes quantity, e.g. 2Gi). Immutable after first install — changing it makes helm upgrade fail rather than lose data.",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$"
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "domain"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable public-facing HTTPS via the K3s Traefik Let's Encrypt cert resolver (AgDR-0005)."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Public domain Marsa is served on. Required — it drives the IngressRoute Host rules (web on <domain>, api on api.<domain>) whether or not TLS is enabled.",
+          "minLength": 1,
+          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?\\.)+[a-z]{2,}$"
+        }
+      }
+    }
+  }
+}

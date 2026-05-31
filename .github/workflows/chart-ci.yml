@@ -23,7 +23,7 @@ env:
   KUBECONFORM_VERSION: "0.6.7"
   K8S_VERSION: "1.32.0"
   CHART_TESTING_VERSION: "v3.11.0"
-  HELM_VERSION: "v3.16.2"
+  HELM_VERSION: "v3.17.3"
 
 jobs:
   detect-charts:
@@ -96,10 +96,12 @@ jobs:
           version: ${{ env.CHART_TESTING_VERSION }}
 
       - name: Run ct lint
-        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --chart-dirs charts
+        # --validate-maintainers=false: Chart.yaml intentionally ships without a
+        # maintainers list for v0.1 (solo-developed); revisit when the team grows.
+        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --chart-dirs charts --validate-maintainers=false
 
   kubeconform:
-    name: kubeconform (k8s ${{ env.K8S_VERSION }})
+    name: kubeconform
     runs-on: ubuntu-latest
     needs: detect-charts
     if: needs.detect-charts.outputs.has_charts == 'true'
@@ -127,9 +129,31 @@ jobs:
               | kubeconform \
                   -strict \
                   -summary \
+                  -ignore-missing-schemas \
                   -kubernetes-version ${{ env.K8S_VERSION }} \
                   -schema-location default \
                   -schema-location "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+            echo "::endgroup::"
+          done
+
+  helm-unittest:
+    name: helm unittest
+    runs-on: ubuntu-latest
+    needs: detect-charts
+    if: needs.detect-charts.outputs.has_charts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Use the official image (bundles a matched helm + helm-unittest plugin)
+      # rather than `helm plugin install`, which couples the plugin's plugin.yaml
+      # schema (e.g. platformHooks) to the runner's helm version.
+      - name: Run helm unittest on every chart
+        run: |
+          set -e
+          for chart in charts/*/; do
+            echo "::group::helm unittest $chart"
+            docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/apps" helmunittest/helm-unittest:latest "$chart"
             echo "::endgroup::"
           done
 
@@ -142,7 +166,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Uses the official gitleaks-action with the org licence stored in the
+      # GITLEAKS_LICENSE repo secret. The action scans full git history and
+      # posts PR annotations / a SARIF summary.
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

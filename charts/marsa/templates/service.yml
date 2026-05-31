@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marsa-web
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: marsa-web
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marsa-api
+spec:
+  ports:
+    - port: 3000
+  selector:
+    app: marsa-api
