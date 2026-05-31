@@ -23,7 +23,7 @@ env:
   KUBECONFORM_VERSION: "0.6.7"
   K8S_VERSION: "1.32.0"
   CHART_TESTING_VERSION: "v3.11.0"
-  HELM_VERSION: "v3.16.2"
+  HELM_VERSION: "v3.17.3"
 
 jobs:
   detect-charts:
