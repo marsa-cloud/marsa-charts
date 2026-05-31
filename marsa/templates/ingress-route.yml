@@ -6,7 +6,7 @@ metadata:
 spec:
   entryPoints:
     - web
-    - websecure
+    - websecure # If TLS is not enabled Traefik default certificate will be used
   routes:
   {{- with .Values.tls.domain }}
   - match: Host(`{{ . }}`)
@@ -25,3 +25,7 @@ spec:
     services:
     - name: marsa-web
       port: 80
+{{- if .Values.tls.enabled }}
+  tls:
+    certResolver: le
+{{- end }}
