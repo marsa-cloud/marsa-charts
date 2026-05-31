@@ -145,20 +145,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: ${{ env.HELM_VERSION }}
-
-      - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest
-
+      # Use the official image (bundles a matched helm + helm-unittest plugin)
+      # rather than `helm plugin install`, which couples the plugin's plugin.yaml
+      # schema (e.g. platformHooks) to the runner's helm version.
       - name: Run helm unittest on every chart
         run: |
           set -e
           for chart in charts/*/; do
             echo "::group::helm unittest $chart"
-            helm unittest "$chart"
+            docker run --rm -v "$PWD:/apps" helmunittest/helm-unittest:latest "$chart"
             echo "::endgroup::"
           done
 
