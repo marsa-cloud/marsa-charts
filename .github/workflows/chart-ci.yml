@@ -173,9 +173,17 @@ jobs:
         env:
           GITLEAKS_VERSION: "8.18.4"
         run: |
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          file="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSL -o "$file" "${base}/${file}"
+          curl -sSL -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          # Verify the download against the published checksum before extracting.
+          grep " ${file}\$" checksums.txt | sha256sum -c -
+          tar -xzf "$file" -C /usr/local/bin gitleaks
+          rm -f "$file" checksums.txt
           gitleaks version
 
       - name: Run gitleaks
-        run: gitleaks detect --source . --no-git --redact --verbose
+        # No --no-git: scan full history (fetch-depth:0 above) so secrets that
+        # existed only in prior commits are still caught.
+        run: gitleaks detect --source . --redact --verbose
