@@ -3,6 +3,7 @@ templates:
   - templates/configmap.yml
   - templates/secret.yml
   - templates/deployment.yml
+  - templates/api-secrets.yml
 tests:
   # ── Postgres init wiring (AgDR-0004 bundled Postgres; #8 grants fix) ──
   - it: init.sh creates the marsa role and a marsa DB owned by it
@@ -103,3 +104,72 @@ tests:
       - matchRegex:
           path: stringData.POSTGRES_PASSWORD
           pattern: "^[A-Za-z0-9]{24}$"
+
+  # ── marsa-api required env wiring (issue #84: api fails fast without these) ──
+  - it: marsa-config derives the public URLs from tls.domain/enabled (https)
+    template: templates/configmap.yml
+    documentIndex: 1
+    set:
+      tls.enabled: true
+      tls.domain: example.com
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-config
+      - equal:
+          path: data.MARSA_WEB_URL
+          value: "https://example.com"
+      - equal:
+          path: data.MARSA_API_PUBLIC_URL
+          value: "https://api.example.com"
+
+  - it: public URLs fall back to http when tls is disabled
+    template: templates/configmap.yml
+    documentIndex: 1
+    set:
+      tls.enabled: false
+      tls.domain: example.com
+    asserts:
+      - equal:
+          path: data.MARSA_WEB_URL
+          value: "http://example.com"
+      - equal:
+          path: data.MARSA_API_PUBLIC_URL
+          value: "http://api.example.com"
+
+  - it: marsa-api pulls its secret keys from the marsa-api-secrets Secret
+    template: templates/deployment.yml
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: marsa-api-secrets
+
+  - it: marsa-web points its nginx /api proxy at the api Service
+    template: templates/deployment.yml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: API_UPSTREAM
+            value: "http://marsa-api:3000"
+
+  - it: api-secrets generates base64-encoded 32-byte keys for both required secrets
+    template: templates/api-secrets.yml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: metadata.name
+          value: marsa-api-secrets
+      # base64 of 32 bytes = 44 chars with a single '=' pad
+      - matchRegex:
+          path: stringData.APP_SECRETS_ENCRYPTION_KEY
+          pattern: "^[A-Za-z0-9+/]{43}=$"
+      - matchRegex:
+          path: stringData.AUTH_SESSION_SECRET_KEY
+          pattern: "^[A-Za-z0-9+/]{43}=$"

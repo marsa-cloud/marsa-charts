@@ -19,6 +19,9 @@ spec:
         image: "ghcr.io/marsa-cloud/marsa-web:{{ .Values.image.tag | default .Chart.AppVersion }}"
         ports:
         - containerPort: 80
+        env:
+        - name: API_UPSTREAM
+          value: "http://marsa-api:3000"
 
 ---
 apiVersion: apps/v1
@@ -45,6 +48,8 @@ spec:
         envFrom:
         - configMapRef:
             name: marsa-config
+        - secretRef:
+            name: marsa-api-secrets
         env:
         - name: MARSA_PASSWORD
           valueFrom:
