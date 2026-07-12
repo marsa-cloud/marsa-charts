@@ -21,3 +21,6 @@ data:
   DB_NAME: "marsa"
   MARSA_WEB_URL: "{{ $scheme }}://{{ .Values.tls.domain }}"
   MARSA_API_PUBLIC_URL: "{{ $scheme }}://api.{{ .Values.tls.domain }}"
+  # Scheme-less on purpose: the api builds `<slug>.<domain>` app hosts and
+  # prepends https:// itself, and Joi validates this as a bare hostname.
+  MARSA_BASE_DOMAIN: "{{ .Values.tls.domain }}"
