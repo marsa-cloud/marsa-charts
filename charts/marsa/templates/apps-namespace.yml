@@ -1,0 +1,10 @@
+# The namespace marsa-api deploys tenant apps into. Templated here so a fresh
+# install is self-contained; Helm creates namespaces before RBAC in its install
+# order, so the Role/RoleBinding below always land in an existing namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.appsNamespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    marsa.cloud/purpose: tenant-apps

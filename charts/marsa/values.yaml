@@ -5,6 +5,10 @@ email: "your-email@example.com"
 # appVersion-pinning once the OCI publish pipeline tags releases.
 image:
   tag: "latest"
+# Namespace the marsa-api operator deploys tenant apps into. MUST match the
+# API's hardcoded OPERATOR_APPS_NAMESPACE (`marsa-apps`) — see AgDR-0007. The
+# chart creates this namespace and grants marsa-api RBAC over it.
+appsNamespace: "marsa-apps"
 postgres:
   # Passwords are auto-generated on first install and persisted in the
   # `postgres-secrets` Secret; subsequent upgrades reuse the stored values
