@@ -6,6 +6,13 @@
   "additionalProperties": false,
   "required": ["email", "image", "postgres", "tls"],
   "properties": {
+    "appsNamespace": {
+      "type": "string",
+      "description": "Namespace the marsa-api operator deploys tenant apps into. MUST match the API's hardcoded OPERATOR_APPS_NAMESPACE (marsa-apps) — see AgDR-0007. The chart creates this namespace and grants marsa-api RBAC over it. Must be a valid DNS-1123 label.",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

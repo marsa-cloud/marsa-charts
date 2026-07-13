@@ -40,6 +40,7 @@ spec:
       labels:
         app: marsa-api
     spec:
+      serviceAccountName: marsa-api
       containers:
       - name: marsa-api
         image: "ghcr.io/marsa-cloud/marsa-api:{{ .Values.image.tag | default .Chart.AppVersion }}"

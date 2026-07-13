@@ -1,0 +1,119 @@
+suite: marsa-api RBAC over the tenant-apps namespace (AgDR-0007, #22)
+templates:
+  - templates/serviceaccount.yml
+  - templates/apps-namespace.yml
+  - templates/rbac.yml
+  - templates/deployment.yml
+release:
+  name: marsa
+  namespace: marsa
+tests:
+  # ── ServiceAccount ──
+  - it: creates a dedicated marsa-api ServiceAccount in the release namespace
+    template: templates/serviceaccount.yml
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: marsa-api
+
+  # ── apps namespace ──
+  - it: creates the tenant-apps namespace from the appsNamespace value
+    template: templates/apps-namespace.yml
+    asserts:
+      - isKind:
+          of: Namespace
+      - equal:
+          path: metadata.name
+          value: marsa-apps
+
+  - it: honours an overridden appsNamespace
+    template: templates/apps-namespace.yml
+    set:
+      appsNamespace: tenants
+    asserts:
+      - equal:
+          path: metadata.name
+          value: tenants
+
+  # ── Role ──
+  - it: defines the deployer Role in the apps namespace, not cluster-wide
+    template: templates/rbac.yml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Role
+      - equal:
+          path: metadata.name
+          value: marsa-deployer
+      - equal:
+          path: metadata.namespace
+          value: marsa-apps
+
+  - it: grants broad verbs over the core + workload API groups
+    template: templates/rbac.yml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["", "apps", "batch", "autoscaling", "networking.k8s.io", "policy"]
+            resources: ["*"]
+            verbs: ["*"]
+
+  - it: grants control over the Traefik CRDs the operator applies per app
+    template: templates/rbac.yml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["traefik.io"]
+            resources: ["*"]
+            verbs: ["*"]
+
+  - it: grants exactly the two intended rules (no rbac.authorization.k8s.io self-escalation rule)
+    template: templates/rbac.yml
+    documentIndex: 0
+    asserts:
+      - lengthEqual:
+          path: rules
+          count: 2
+
+  # ── RoleBinding ──
+  - it: binds the Role to the marsa-api SA, subject in the release namespace
+    template: templates/rbac.yml
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: RoleBinding
+      - equal:
+          path: metadata.namespace
+          value: marsa-apps
+      - equal:
+          path: roleRef.name
+          value: marsa-deployer
+      - equal:
+          path: subjects[0].kind
+          value: ServiceAccount
+      - equal:
+          path: subjects[0].name
+          value: marsa-api
+      - equal:
+          path: subjects[0].namespace
+          value: marsa
+
+  # ── Deployment wiring ──
+  - it: runs the marsa-api pod under the marsa-api ServiceAccount, not default
+    template: templates/deployment.yml
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: marsa-api
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: marsa-api
