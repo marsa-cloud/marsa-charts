@@ -1,0 +1,27 @@
+{{/*
+k3s installs Traefik via its helm-controller as a HelmChart named `traefik` in
+kube-system; the only supported way to customise it is a HelmChartConfig with
+that exact name. The match is by name, so this is the single place any Traefik
+setting can live — customisation is NOT additive across files.
+
+Rendered unconditionally. allowCrossNamespace is required for every tenant
+app's IngressRoute to reach the KEDA interceptor in the `keda` namespace
+(AgDR-0043); gating it behind tls.enabled would leave Traefik silently
+dropping every app's backend and serving 404s with nothing visibly wrong in
+the resources. Only the ACME arguments are TLS-conditional.
+*/}}
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--providers.kubernetescrd.allowCrossNamespace=true"
+{{- if .Values.tls.enabled }}
+      - "--certificatesresolvers.le.acme.email={{ .Values.email }}"
+      - "--certificatesresolvers.le.acme.storage=/data/acme.json"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.caServer=https://acme-v02.api.letsencrypt.org/directory"
+{{- end }}

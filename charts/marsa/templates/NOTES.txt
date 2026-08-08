@@ -32,3 +32,19 @@ won't get you a trusted cert (use it only for plain-HTTP testing).
 Check the rollout:
 
   kubectl get pods -n {{ .Release.Namespace }}
+
+{{- if not (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "httpscaledobjects.http.keda.sh") }}
+
+WARNING: KEDA's HTTP add-on is not installed on this cluster.
+
+Deployed apps are scaled by KEDA and routed through its interceptor, so they
+will return 404 until it is present. `scripts/install.sh` in the marsa repo
+installs it; to do it by hand:
+
+  helm repo add kedacore https://kedacore.github.io/charts
+  helm upgrade --install keda kedacore/keda \
+    --namespace keda --create-namespace --version 2.20.2
+  helm upgrade --install keda-add-ons-http kedacore/keda-add-ons-http \
+    --namespace keda --version 0.15.0 \
+    --set interceptor.replicas.min=2 --set interceptor.replicas.max=4
+{{- end }}
