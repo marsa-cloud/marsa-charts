@@ -76,11 +76,24 @@ tests:
   # Without this rule the operator's HTTPScaledObject apply is refused and every
   # deploy fails with a 500 (marsa#119); the api suite cannot catch it because its
   # mock deploy backend applies nothing.
-  - it: grants control over the KEDA HTTP add-on CRDs the operator applies per app
+  - it: grants control over the KEDA HTTP add-on CRD the operator applies per app
     template: templates/rbac.yml
     documentIndex: 0
     asserts:
       - contains:
+          path: rules
+          content:
+            apiGroups: ["http.keda.sh"]
+            resources: ["httpscaledobjects"]
+            verbs: ["*"]
+
+  # InterceptorRoute shares the http.keda.sh group but belongs to the add-on, not
+  # to Marsa. Naming the resource keeps it out of reach.
+  - it: does not grant the deployer any wildcard over the http.keda.sh group
+    template: templates/rbac.yml
+    documentIndex: 0
+    asserts:
+      - notContains:
           path: rules
           content:
             apiGroups: ["http.keda.sh"]
