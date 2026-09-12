@@ -1,0 +1,44 @@
+{{/*
+k3s installs Traefik via its helm-controller as a HelmChart named `traefik` in
+kube-system; the only supported way to customise it is a HelmChartConfig with
+that exact name. The match is by name, so this is the single place any Traefik
+setting can live — customisation is NOT additive across files.
+
+Rendered unconditionally. allowCrossNamespace is required for every tenant
+app's IngressRoute to reach the KEDA interceptor in the `keda` namespace
+(AgDR-0043); gating it behind tls.enabled would leave Traefik silently
+dropping every app's backend and serving 404s with nothing visibly wrong in
+the resources. Only the ACME arguments are TLS-conditional.
+
+Residual risk, accepted (CodeRabbit review, PR #25). allowCrossNamespace is a
+global Traefik switch — it has no per-destination or per-namespace form — so
+once it is on, any IngressRoute in the cluster may name a Service in any
+namespace. That widens what a compromised marsa-api could reach: rbac.yml
+scopes it to `appsNamespace` precisely so it cannot touch other namespaces,
+and this flag lets an IngressRoute it writes publish a Service outside that
+scope with no RBAC in the path.
+
+Accepted rather than mitigated because the path opens only *after* marsa-api
+is already fully compromised — by which point the attacker holds `*` on core
+resources in appsNamespace, including every tenant Secret. It is not reachable
+by a tenant: the interceptor's name and namespace are hardcoded constants in
+the operator's manifest renderer, so no tenant-supplied value reaches the
+backend reference. Narrowing it needs an admission policy (a
+ValidatingAdmissionPolicy pinning IngressRoute backends to the `keda`
+namespace), tracked separately.
+*/}}
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--providers.kubernetescrd.allowCrossNamespace=true"
+{{- if .Values.tls.enabled }}
+      - "--certificatesresolvers.le.acme.email={{ .Values.email }}"
+      - "--certificatesresolvers.le.acme.storage=/data/acme.json"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.caServer=https://acme-v02.api.letsencrypt.org/directory"
+{{- end }}

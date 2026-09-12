@@ -1,0 +1,50 @@
+suite: traefik config
+templates:
+  - traefik-config.yaml
+tests:
+  - it: enables cross-namespace IngressRoute backends
+    set:
+      tls.enabled: true
+      tls.domain: example.com
+      email: a@b.com
+    asserts:
+      - equal:
+          path: metadata.name
+          value: traefik
+      - equal:
+          path: metadata.namespace
+          value: kube-system
+      - matchRegex:
+          path: spec.valuesContent
+          pattern: "providers\\.kubernetescrd\\.allowCrossNamespace=true"
+
+  # The regression this suite exists for: gating the whole HelmChartConfig on
+  # tls.enabled would leave Traefik rejecting every app's interceptor backend,
+  # and the symptom is a silent 404 with nothing visibly wrong in the resources.
+  - it: still configures Traefik when TLS is disabled
+    set:
+      tls.enabled: false
+      tls.domain: example.com
+      email: a@b.com
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchRegex:
+          path: spec.valuesContent
+          pattern: "providers\\.kubernetescrd\\.allowCrossNamespace=true"
+      - notMatchRegex:
+          path: spec.valuesContent
+          pattern: "certificatesresolvers"
+
+  - it: configures the ACME resolver when TLS is enabled
+    set:
+      tls.enabled: true
+      tls.domain: example.com
+      email: ops@example.com
+    asserts:
+      - matchRegex:
+          path: spec.valuesContent
+          pattern: "certificatesresolvers\\.le\\.acme\\.email=ops@example\\.com"
+      - matchRegex:
+          path: spec.valuesContent
+          pattern: "certificatesresolvers\\.le\\.acme\\.tlschallenge=true"
