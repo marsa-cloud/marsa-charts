@@ -18,6 +18,13 @@ rules:
   - apiGroups: ["traefik.io"]
     resources: ["*"]
     verbs: ["*"]
+  # KEDA HTTP add-on CRDs (HTTPScaledObject) the operator applies and deletes per
+  # app (marsa#119). The broad-by-design note above does not cover CRDs: apiGroups
+  # is an explicit list, so every new API group the operator writes to needs its
+  # own rule here and a chart release to go with it.
+  - apiGroups: ["http.keda.sh"]
+    resources: ["*"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
