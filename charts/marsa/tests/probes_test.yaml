@@ -1,0 +1,54 @@
+suite: api/web health probes
+templates:
+  - deployment.yml
+tests:
+  - it: gives marsa-web readiness and liveness probes on its own static root
+    documentSelector:
+      path: metadata.name
+      value: marsa-web
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value: { path: /, port: 80 }
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value: { path: /, port: 80 }
+
+  - it: keeps marsa-web probes off the proxied /api/ path
+    documentSelector:
+      path: metadata.name
+      value: marsa-web
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          pattern: "^/api"
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          pattern: "^/api"
+
+  - it: gives marsa-api startup, readiness and liveness probes on /api/v1/status
+    documentSelector:
+      path: metadata.name
+      value: marsa-api
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet
+          value: { path: /api/v1/status, port: 3000 }
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value: { path: /api/v1/status, port: 3000 }
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value: { path: /api/v1/status, port: 3000 }
+
+  - it: allows marsa-api a startup window long enough for boot-time migrations
+    documentSelector:
+      path: metadata.name
+      value: marsa-api
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.periodSeconds
+          value: 5
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.failureThreshold
+          value: 36

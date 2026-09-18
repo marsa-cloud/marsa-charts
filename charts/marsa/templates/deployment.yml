@@ -22,6 +22,18 @@ spec:
         env:
         - name: API_UPSTREAM
           value: "http://marsa-api:3000"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 15
+          failureThreshold: 3
 
 ---
 apiVersion: apps/v1
@@ -59,3 +71,22 @@ spec:
               key: MARSA_PASSWORD
         - name: DATABASE_URL
           value: "postgresql://marsa:$(MARSA_PASSWORD)@postgres:5432/marsa"
+        startupProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 36
+        readinessProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 3
