@@ -2,8 +2,6 @@ suite: api/web health probes
 templates:
   - deployment.yml
 tests:
-  # Without a readiness probe a crashlooping pod still passes through Running,
-  # so `kubectl rollout status` reports success on a dead api (marsa#175).
   - it: gives marsa-web readiness and liveness probes on its own static root
     documentSelector:
       path: metadata.name
@@ -16,8 +14,6 @@ tests:
           path: spec.template.spec.containers[0].livenessProbe.httpGet
           value: { path: /, port: 80 }
 
-  # `/` is served from nginx's own html root. Probing an /api/ path would proxy
-  # to marsa-api and restart healthy web pods whenever the api is down.
   - it: keeps marsa-web probes off the proxied /api/ path
     documentSelector:
       path: metadata.name
@@ -45,8 +41,6 @@ tests:
           path: spec.template.spec.containers[0].livenessProbe.httpGet
           value: { path: /api/v1/status, port: 3000 }
 
-  # The api runs migrations in onModuleInit before it listens. The startup probe
-  # owns that window so liveness can stay strict once the process is up.
   - it: allows marsa-api a startup window long enough for boot-time migrations
     documentSelector:
       path: metadata.name
