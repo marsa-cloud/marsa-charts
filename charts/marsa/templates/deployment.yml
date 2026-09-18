@@ -22,6 +22,20 @@ spec:
         env:
         - name: API_UPSTREAM
           value: "http://marsa-api:3000"
+        # `/` is served from nginx's static root, not proxied, so these probes
+        # stay green while marsa-api is down. Never point them at /api/.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 15
+          failureThreshold: 3
 
 ---
 apiVersion: apps/v1
@@ -59,3 +73,30 @@ spec:
               key: MARSA_PASSWORD
         - name: DATABASE_URL
           value: "postgresql://marsa:$(MARSA_PASSWORD)@postgres:5432/marsa"
+        # /api/v1/status is @Public() and returns static info with no DB access.
+        # Liveness MUST stay DB-free: if the endpoint ever grows a Postgres check,
+        # a DB blip would restart every api pod. Give readiness its own endpoint
+        # for that instead.
+        #
+        # The api runs migrations before it listens, so the startup probe allows
+        # up to 3 minutes (36 x 5s) for boot. Readiness and liveness only start
+        # once it passes, which keeps liveness strict after boot.
+        startupProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 36
+        readinessProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/v1/status
+            port: 3000
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 3
