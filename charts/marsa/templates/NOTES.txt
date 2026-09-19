@@ -48,3 +48,9 @@ installs it; to do it by hand:
     --namespace keda --version 0.15.0 \
     --set interceptor.replicas.min=2 --set interceptor.replicas.max=4
 {{- end }}
+
+Uninstalling: marsa-api creates one namespace per environment (<project>-<environment>),
+labelled marsa.cloud/managed-by=marsa-api. Helm does not own them, so `helm uninstall`
+leaves them and their apps running. Remove them explicitly if you want them gone:
+
+  kubectl delete namespace -l marsa.cloud/managed-by=marsa-api

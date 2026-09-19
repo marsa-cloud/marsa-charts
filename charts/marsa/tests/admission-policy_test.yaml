@@ -23,6 +23,9 @@ tests:
       - lengthEqual:
           path: spec.matchConstraints.resourceRules
           count: 2
+      - equal:
+          path: spec.matchConstraints.resourceRules[0].resources
+          value: ["namespaces", "namespaces/*"]
       - lengthEqual:
           path: spec.validations
           count: 4

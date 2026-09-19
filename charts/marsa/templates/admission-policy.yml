@@ -9,14 +9,15 @@ spec:
   failurePolicy: Fail
   matchConstraints:
     resourceRules:
-      - apiGroups: ['']
-        apiVersions: ['v1']
-        operations: ['CREATE', 'UPDATE', 'DELETE']
-        resources: ['namespaces']
-      - apiGroups: ['rbac.authorization.k8s.io']
-        apiVersions: ['v1']
-        operations: ['CREATE', 'UPDATE', 'DELETE']
-        resources: ['rolebindings']
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        # Subresources too: each namespace's marsa-deployer binding also reaches its status/finalize.
+        resources: ["namespaces", "namespaces/*"]
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["rolebindings"]
   matchConditions:
     - name: marsa-api-only
       expression: "request.userInfo.username == 'system:serviceaccount:{{ .Release.Namespace }}:marsa-api'"

@@ -3,39 +3,41 @@
 # cluster-wide. rbac.authorization.k8s.io stays out of the deployer rules so the SA can't
 # escalate; the only RBAC it holds is creating RoleBindings, and `bind` limited to
 # marsa-deployer means it can hand out nothing else. admission-policy.yml closes what RBAC
-# can't express: which namespaces it may create, delete, or bind into.
+# can't express: which namespaces it may create, delete, or bind into. The per-namespace
+# marsa-deployer binding also covers that namespace object itself, so the policy fences its
+# subresources (status, finalize) too.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: marsa-deployer
 rules:
-  - apiGroups: ['', 'apps', 'batch', 'autoscaling', 'networking.k8s.io', 'policy']
-    resources: ['*']
-    verbs: ['*']
+  - apiGroups: ["", "apps", "batch", "autoscaling", "networking.k8s.io", "policy"]
+    resources: ["*"]
+    verbs: ["*"]
   # Traefik CRDs (IngressRoute, Middleware, ...) the operator applies per app.
-  - apiGroups: ['traefik.io']
-    resources: ['*']
-    verbs: ['*']
+  - apiGroups: ["traefik.io"]
+    resources: ["*"]
+    verbs: ["*"]
   # Named, not wildcarded: http.keda.sh also holds InterceptorRoute, the add-on's own state (marsa#119).
-  - apiGroups: ['http.keda.sh']
-    resources: ['httpscaledobjects']
-    verbs: ['*']
+  - apiGroups: ["http.keda.sh"]
+    resources: ["httpscaledobjects"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: marsa-namespace-manager
 rules:
-  - apiGroups: ['']
-    resources: ['namespaces']
-    verbs: ['get', 'create', 'delete']
-  - apiGroups: ['rbac.authorization.k8s.io']
-    resources: ['rolebindings']
-    verbs: ['get', 'create']
-  - apiGroups: ['rbac.authorization.k8s.io']
-    resources: ['clusterroles']
-    verbs: ['bind']
-    resourceNames: ['marsa-deployer']
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: ["marsa-deployer"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
