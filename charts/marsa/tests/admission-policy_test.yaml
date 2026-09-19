@@ -1,0 +1,40 @@
+suite: ValidatingAdmissionPolicy fencing marsa-api to namespaces it manages (#142)
+templates:
+  - templates/admission-policy.yml
+release:
+  name: marsa
+  namespace: marsa
+tests:
+  - it: matches only the marsa-api service account of this release
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: ValidatingAdmissionPolicy
+      - equal:
+          path: spec.matchConditions[0].expression
+          value: "request.userInfo.username == 'system:serviceaccount:marsa:marsa-api'"
+      - equal:
+          path: spec.failurePolicy
+          value: Fail
+
+  - it: covers namespace and rolebinding writes
+    documentIndex: 0
+    asserts:
+      - lengthEqual:
+          path: spec.matchConstraints.resourceRules
+          count: 2
+      - lengthEqual:
+          path: spec.validations
+          count: 4
+
+  - it: is enforced with Deny
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: ValidatingAdmissionPolicyBinding
+      - equal:
+          path: spec.policyName
+          value: marsa-api-namespace-fence
+      - contains:
+          path: spec.validationActions
+          content: Deny
