@@ -112,11 +112,11 @@ tests:
           path: subjects[0].namespace
           value: marsa
 
-  - it: renders exactly the two ClusterRoles and one ClusterRoleBinding (marsa-deployer is never bound cluster-wide)
+  - it: renders three ClusterRoles and two ClusterRoleBindings (marsa-deployer is never bound cluster-wide)
     template: templates/rbac.yml
     asserts:
       - hasDocuments:
-          count: 3
+          count: 5
 
   # ── Deployment wiring ──
   - it: runs marsa-api under its ServiceAccount and tells it its own namespace
@@ -133,3 +133,39 @@ tests:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+
+  # ── marsa-cluster-reader: node reads for the pin picker (marsa-cloud/marsa#143) ──
+  - it: grants marsa-api read-only access to nodes
+    template: templates/rbac.yml
+    documentIndex: 3
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - equal:
+          path: metadata.name
+          value: marsa-cluster-reader
+      - contains:
+          path: rules
+          content:
+            apiGroups: ['']
+            resources: ['nodes']
+            verbs: ['get', 'list']
+
+  - it: binds the cluster reader to marsa-api cluster-wide, since nodes are not namespaced
+    template: templates/rbac.yml
+    documentIndex: 4
+    asserts:
+      - isKind:
+          of: ClusterRoleBinding
+      - equal:
+          path: metadata.name
+          value: marsa-cluster-reader
+      - equal:
+          path: roleRef.name
+          value: marsa-cluster-reader
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: marsa-api
+            namespace: marsa
