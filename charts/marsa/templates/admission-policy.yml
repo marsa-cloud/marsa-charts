@@ -1,0 +1,56 @@
+# RBAC can't scope namespace create/delete or RoleBinding placement by label, so this does:
+# marsa-api may only create namespaces it labels as its own, only delete/modify those, and
+# only bind marsa-deployer (to itself) inside them. Other identities are unaffected.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: marsa-api-namespace-fence
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        # Subresources too: each namespace's marsa-deployer binding also reaches its status/finalize.
+        resources: ["namespaces", "namespaces/*"]
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["rolebindings"]
+  matchConditions:
+    - name: marsa-api-only
+      expression: "request.userInfo.username == 'system:serviceaccount:{{ .Release.Namespace }}:marsa-api'"
+  variables:
+    - name: isNamespace
+      expression: "request.resource.resource == 'namespaces'"
+  validations:
+    - expression: >-
+        !variables.isNamespace || request.operation != 'CREATE' ||
+        (has(object.metadata.labels) && 'marsa.cloud/managed-by' in object.metadata.labels &&
+        object.metadata.labels['marsa.cloud/managed-by'] == 'marsa-api')
+      message: marsa-api may only create namespaces labelled marsa.cloud/managed-by=marsa-api
+    - expression: >-
+        !variables.isNamespace || request.operation == 'CREATE' ||
+        (has(oldObject.metadata.labels) && 'marsa.cloud/managed-by' in oldObject.metadata.labels &&
+        oldObject.metadata.labels['marsa.cloud/managed-by'] == 'marsa-api')
+      message: marsa-api may only modify or delete namespaces it manages
+    - expression: >-
+        variables.isNamespace ||
+        (has(namespaceObject.metadata.labels) && 'marsa.cloud/managed-by' in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels['marsa.cloud/managed-by'] == 'marsa-api')
+      message: marsa-api may only write RoleBindings inside namespaces it manages
+    - expression: >-
+        variables.isNamespace || request.operation == 'DELETE' ||
+        (object.roleRef.kind == 'ClusterRole' && object.roleRef.name == 'marsa-deployer' &&
+        object.subjects.all(s, s.kind == 'ServiceAccount' && s.name == 'marsa-api' &&
+        s.namespace == '{{ .Release.Namespace }}'))
+      message: marsa-api may only bind marsa-deployer, and only to itself
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: marsa-api-namespace-fence
+spec:
+  policyName: marsa-api-namespace-fence
+  validationActions: [Deny]

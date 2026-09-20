@@ -71,6 +71,10 @@ spec:
               key: MARSA_PASSWORD
         - name: DATABASE_URL
           value: "postgresql://marsa:$(MARSA_PASSWORD)@postgres:5432/marsa"
+        - name: MARSA_API_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         startupProbe:
           httpGet:
             path: /api/v1/status

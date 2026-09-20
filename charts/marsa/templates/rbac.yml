@@ -1,15 +1,15 @@
-# RBAC granting the marsa-api operator control over tenant-app resources in the
-# apps namespace. Namespace-scoped (Role, not ClusterRole) so a marsa-api
-# compromise cannot reach the control-plane namespace or cluster scope. Broad
-# within marsa-apps by design (AgDR-0007): the operator will grow new deploy
-# capabilities and we don't want an RBAC change + chart release for each. The
-# rbac.authorization.k8s.io group is deliberately excluded so the SA cannot
-# escalate its own privileges.
+# marsa-api creates one namespace per environment (#142) and binds marsa-deployer into each,
+# so its write access is exactly the namespaces it manages. marsa-deployer is never bound
+# cluster-wide. rbac.authorization.k8s.io stays out of the deployer rules so the SA can't
+# escalate; the only RBAC it holds is creating RoleBindings, and `bind` limited to
+# marsa-deployer means it can hand out nothing else. admission-policy.yml closes what RBAC
+# can't express: which namespaces it may create, delete, or bind into. The per-namespace
+# marsa-deployer binding also covers that namespace object itself, so the policy fences its
+# subresources (status, finalize) too.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: marsa-deployer
-  namespace: {{ .Values.appsNamespace }}
 rules:
   - apiGroups: ["", "apps", "batch", "autoscaling", "networking.k8s.io", "policy"]
     resources: ["*"]
@@ -18,29 +18,35 @@ rules:
   - apiGroups: ["traefik.io"]
     resources: ["*"]
     verbs: ["*"]
-  # KEDA HTTP add-on CRDs the operator applies and deletes per app (marsa#119).
-  # The broad-by-design note above does not cover CRDs: apiGroups is an explicit
-  # list, so every new API group the operator writes to needs its own rule here
-  # and a chart release to go with it.
-  #
-  # Resources are named rather than wildcarded, unlike the rules above. This group
-  # is not uniformly ours: every traefik.io kind is a per-app routing object the
-  # operator may grow into, but http.keda.sh also holds InterceptorRoute — the
-  # add-on's own routing state, reconciled by its cluster-scoped controllers and
-  # never written by Marsa.
+  # Named, not wildcarded: http.keda.sh also holds InterceptorRoute, the add-on's own state (marsa#119).
   - apiGroups: ["http.keda.sh"]
     resources: ["httpscaledobjects"]
     verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRole
 metadata:
-  name: marsa-deployer
-  namespace: {{ .Values.appsNamespace }}
+  name: marsa-namespace-manager
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: ["marsa-deployer"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: marsa-namespace-manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: marsa-deployer
+  kind: ClusterRole
+  name: marsa-namespace-manager
 subjects:
   - kind: ServiceAccount
     name: marsa-api

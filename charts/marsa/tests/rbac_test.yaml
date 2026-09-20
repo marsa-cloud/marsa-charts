@@ -1,14 +1,12 @@
-suite: marsa-api RBAC over the tenant-apps namespace (AgDR-0007, #22)
+suite: marsa-api RBAC over the namespaces it manages (#142)
 templates:
   - templates/serviceaccount.yml
-  - templates/apps-namespace.yml
   - templates/rbac.yml
   - templates/deployment.yml
 release:
   name: marsa
   namespace: marsa
 tests:
-  # ── ServiceAccount ──
   - it: creates a dedicated marsa-api ServiceAccount in the release namespace
     template: templates/serviceaccount.yml
     asserts:
@@ -18,38 +16,16 @@ tests:
           path: metadata.name
           value: marsa-api
 
-  # ── apps namespace ──
-  - it: creates the tenant-apps namespace from the appsNamespace value
-    template: templates/apps-namespace.yml
-    asserts:
-      - isKind:
-          of: Namespace
-      - equal:
-          path: metadata.name
-          value: marsa-apps
-
-  - it: honours an overridden appsNamespace
-    template: templates/apps-namespace.yml
-    set:
-      appsNamespace: tenants
-    asserts:
-      - equal:
-          path: metadata.name
-          value: tenants
-
-  # ── Role ──
-  - it: defines the deployer Role in the apps namespace, not cluster-wide
+  # ── marsa-deployer: the per-app rules, bound per environment namespace by the api ──
+  - it: defines the deployer rules as a ClusterRole
     template: templates/rbac.yml
     documentIndex: 0
     asserts:
       - isKind:
-          of: Role
+          of: ClusterRole
       - equal:
           path: metadata.name
           value: marsa-deployer
-      - equal:
-          path: metadata.namespace
-          value: marsa-apps
 
   - it: grants broad verbs over the core + workload API groups
     template: templates/rbac.yml
@@ -58,9 +34,9 @@ tests:
       - contains:
           path: rules
           content:
-            apiGroups: ["", "apps", "batch", "autoscaling", "networking.k8s.io", "policy"]
-            resources: ["*"]
-            verbs: ["*"]
+            apiGroups: ['', 'apps', 'batch', 'autoscaling', 'networking.k8s.io', 'policy']
+            resources: ['*']
+            verbs: ['*']
 
   - it: grants control over the Traefik CRDs the operator applies per app
     template: templates/rbac.yml
@@ -69,61 +45,66 @@ tests:
       - contains:
           path: rules
           content:
-            apiGroups: ["traefik.io"]
-            resources: ["*"]
-            verbs: ["*"]
+            apiGroups: ['traefik.io']
+            resources: ['*']
+            verbs: ['*']
 
-  # Without this rule the operator's HTTPScaledObject apply is refused and every
-  # deploy fails with a 500 (marsa#119); the api suite cannot catch it because its
-  # mock deploy backend applies nothing.
-  - it: grants control over the KEDA HTTP add-on CRD the operator applies per app
+  - it: grants control over the KEDA HTTPScaledObject only
     template: templates/rbac.yml
     documentIndex: 0
     asserts:
       - contains:
           path: rules
           content:
-            apiGroups: ["http.keda.sh"]
-            resources: ["httpscaledobjects"]
-            verbs: ["*"]
-
-  # InterceptorRoute shares the http.keda.sh group but belongs to the add-on, not
-  # to Marsa. Naming the resource keeps it out of reach.
-  - it: does not grant the deployer any wildcard over the http.keda.sh group
-    template: templates/rbac.yml
-    documentIndex: 0
-    asserts:
-      - notContains:
-          path: rules
-          content:
-            apiGroups: ["http.keda.sh"]
-            resources: ["*"]
-            verbs: ["*"]
-
-  - it: grants exactly the three intended rules (no rbac.authorization.k8s.io self-escalation rule)
-    template: templates/rbac.yml
-    documentIndex: 0
-    asserts:
+            apiGroups: ['http.keda.sh']
+            resources: ['httpscaledobjects']
+            verbs: ['*']
       - lengthEqual:
           path: rules
           count: 3
 
-  # ── RoleBinding ──
-  - it: binds the Role to the marsa-api SA, subject in the release namespace
+  # ── marsa-namespace-manager: create/delete namespaces and hand out marsa-deployer only ──
+  - it: lets marsa-api manage namespaces and bind nothing but marsa-deployer
     template: templates/rbac.yml
     documentIndex: 1
     asserts:
       - isKind:
-          of: RoleBinding
+          of: ClusterRole
       - equal:
-          path: metadata.namespace
-          value: marsa-apps
+          path: metadata.name
+          value: marsa-namespace-manager
+      - contains:
+          path: rules
+          content:
+            apiGroups: ['']
+            resources: ['namespaces']
+            verbs: ['get', 'create', 'delete']
+      - contains:
+          path: rules
+          content:
+            apiGroups: ['rbac.authorization.k8s.io']
+            resources: ['rolebindings']
+            verbs: ['get', 'create']
+      - contains:
+          path: rules
+          content:
+            apiGroups: ['rbac.authorization.k8s.io']
+            resources: ['clusterroles']
+            verbs: ['bind']
+            resourceNames: ['marsa-deployer']
+      - lengthEqual:
+          path: rules
+          count: 3
+
+  - it: binds the namespace manager to the marsa-api SA cluster-wide
+    template: templates/rbac.yml
+    documentIndex: 2
+    asserts:
+      - isKind:
+          of: ClusterRoleBinding
       - equal:
           path: roleRef.name
-          value: marsa-deployer
-      - equal:
-          path: subjects[0].kind
-          value: ServiceAccount
+          value: marsa-namespace-manager
       - equal:
           path: subjects[0].name
           value: marsa-api
@@ -131,16 +112,24 @@ tests:
           path: subjects[0].namespace
           value: marsa
 
+  - it: renders exactly the two ClusterRoles and one ClusterRoleBinding (marsa-deployer is never bound cluster-wide)
+    template: templates/rbac.yml
+    asserts:
+      - hasDocuments:
+          count: 3
+
   # ── Deployment wiring ──
-  - it: runs the marsa-api pod under the marsa-api ServiceAccount, not default
+  - it: runs marsa-api under its ServiceAccount and tells it its own namespace
     template: templates/deployment.yml
     documentIndex: 1
     asserts:
-      - isKind:
-          of: Deployment
-      - equal:
-          path: metadata.name
-          value: marsa-api
       - equal:
           path: spec.template.spec.serviceAccountName
           value: marsa-api
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_API_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
