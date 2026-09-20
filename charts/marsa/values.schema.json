@@ -6,10 +6,6 @@
   "additionalProperties": false,
   "required": ["email", "image", "postgres", "tls"],
   "properties": {
-    "appsNamespace": {
-      "type": "string",
-      "description": "Deprecated and ignored since marsa#142: each environment now gets its own namespace. Still accepted so upgrades that reuse older values keep validating."
-    },
     "image": {
       "type": "object",
       "additionalProperties": false,
