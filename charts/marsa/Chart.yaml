@@ -2,7 +2,7 @@ apiVersion: v2
 name: marsa
 description: A Helm chart for Marsa
 type: application
-version: 0.0.1-alpha.8
+version: 0.0.1-alpha.9
 # ValidatingAdmissionPolicy (admission-policy.yml) is admissionregistration.k8s.io/v1 from 1.30.
 kubeVersion: ">=1.30.0-0"
 appVersion: "0.1.0"
