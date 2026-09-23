@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marsa-registry-config
+data:
+  config.json: |
+    {{- include "marsa.registryConfig" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: marsa-registry
+spec:
+  selector:
+    app: marsa-registry
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: marsa-registry
+spec:
+  serviceName: marsa-registry
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marsa-registry
+  template:
+    metadata:
+      labels:
+        app: marsa-registry
+      annotations:
+        checksum/config: {{ include "marsa.registryConfig" . | sha256sum | trunc 16 | quote }}
+    spec:
+      containers:
+        - name: zot
+          image: "ghcr.io/project-zot/zot-minimal:{{ .Values.registry.imageTag }}"
+          ports:
+            - containerPort: 5000
+          env:
+            # Keeps the Go heap under the container limit instead of OOM-killing on a large push.
+            - name: GOMEMLIMIT
+              value: 200MiB
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot/config.json
+              subPath: config.json
+            - name: auth
+              mountPath: /etc/zot/auth
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/registry
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: 5000
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            periodSeconds: 15
+      volumes:
+        - name: config
+          configMap:
+            name: marsa-registry-config
+        - name: auth
+          secret:
+            secretName: marsa-registry-secrets
+            items:
+              - key: htpasswd
+                path: htpasswd
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.registry.storageSize }}
