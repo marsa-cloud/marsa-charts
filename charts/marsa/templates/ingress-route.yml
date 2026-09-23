@@ -18,6 +18,11 @@ spec:
     services:
     - name: marsa-api
       port: 3000
+  - match: Host(`registry.{{ . }}`)
+    kind: Rule
+    services:
+    - name: marsa-registry
+      port: 5000
   {{- end }}
   - match: PathPrefix(`/`)
     kind: Rule

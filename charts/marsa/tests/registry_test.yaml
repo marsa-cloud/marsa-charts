@@ -2,6 +2,9 @@ suite: registry
 templates:
   - registry-secrets.yml
   - registry.yml
+  - ingress-route.yml
+  - configmap.yml
+  - deployment.yml
 set:
   email: a@b.com
   tls.enabled: true
@@ -92,3 +95,47 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 5000
+
+  - it: routes registry.<domain> to the registry
+    template: ingress-route.yml
+    asserts:
+      - contains:
+          path: spec.routes
+          content:
+            match: Host(`registry.example.com`)
+            kind: Rule
+            services:
+              - name: marsa-registry
+                port: 5000
+
+  - it: tells the api the public pull host and the in-cluster url
+    template: configmap.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-config
+    asserts:
+      - equal:
+          path: data.MARSA_REGISTRY_HOST
+          value: registry.example.com
+      - equal:
+          path: data.MARSA_REGISTRY_URL
+          value: http://marsa-registry:5000
+
+  - it: hands the api both registry passwords from the generated Secret
+    template: deployment.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-api
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_REGISTRY_PUSH_PASSWORD
+            valueFrom:
+              secretKeyRef: { name: marsa-registry-secrets, key: PUSH_PASSWORD }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_REGISTRY_PULL_PASSWORD
+            valueFrom:
+              secretKeyRef: { name: marsa-registry-secrets, key: PULL_PASSWORD }
