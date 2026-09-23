@@ -1,0 +1,30 @@
+suite: registry
+templates:
+  - registry-secrets.yml
+set:
+  email: a@b.com
+  tls.enabled: true
+  tls.domain: example.com
+tests:
+  - it: generates a push and a pull password
+    template: registry-secrets.yml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-registry-secrets
+      - matchRegex:
+          path: stringData.PUSH_PASSWORD
+          pattern: "^[A-Za-z0-9]{32}$"
+      - matchRegex:
+          path: stringData.PULL_PASSWORD
+          pattern: "^[A-Za-z0-9]{32}$"
+
+  - it: writes a bcrypt htpasswd entry for each fixed user
+    template: registry-secrets.yml
+    asserts:
+      - matchRegex:
+          path: stringData.htpasswd
+          pattern: "(?m)^marsa-push:\\$2[aby]\\$"
+      - matchRegex:
+          path: stringData.htpasswd
+          pattern: "(?m)^marsa-pull:\\$2[aby]\\$"
