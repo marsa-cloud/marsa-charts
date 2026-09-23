@@ -1,0 +1,63 @@
+suite: builds
+templates:
+  - builds.yml
+release:
+  namespace: marsa
+set:
+  email: a@b.com
+  tls.enabled: true
+  tls.domain: example.com
+tests:
+  - it: creates the build namespace
+    documentSelector:
+      path: kind
+      value: Namespace
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-builds
+
+  - it: lets marsa-api run Jobs and read their pods and logs in marsa-builds only
+    documentSelector:
+      path: kind
+      value: Role
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: marsa-builds
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["batch"]
+            resources: ["jobs"]
+            verbs: ["create", "get", "list", "delete"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets"]
+            verbs: ["create", "get", "delete"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["pods", "pods/log"]
+            verbs: ["get", "list"]
+
+  - it: binds the role to the marsa-api service account of the release namespace
+    documentSelector:
+      path: kind
+      value: RoleBinding
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: marsa-builds
+      - equal:
+          path: roleRef.name
+          value: marsa-builder
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: marsa-api
+            namespace: marsa

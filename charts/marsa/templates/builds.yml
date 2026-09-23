@@ -1,0 +1,35 @@
+# Builds run apart from environment namespaces: rootless BuildKit needs Unconfined seccomp/AppArmor.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: marsa-builds
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: marsa-builder
+  namespace: marsa-builds
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: marsa-builder
+  namespace: marsa-builds
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: marsa-builder
+subjects:
+  - kind: ServiceAccount
+    name: marsa-api
+    namespace: {{ .Release.Namespace }}

@@ -12,6 +12,9 @@ set:
 tests:
   - it: generates a push and a pull password
     template: registry-secrets.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-secrets
     asserts:
       - equal:
           path: metadata.name
@@ -25,6 +28,9 @@ tests:
 
   - it: writes a bcrypt htpasswd entry for each fixed user
     template: registry-secrets.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-secrets
     asserts:
       - matchRegex:
           path: stringData.htpasswd
@@ -110,6 +116,8 @@ tests:
 
   - it: tells the api the public pull host and the in-cluster url
     template: configmap.yml
+    release:
+      namespace: NAMESPACE
     documentSelector:
       path: metadata.name
       value: marsa-config
@@ -119,7 +127,7 @@ tests:
           value: registry.example.com
       - equal:
           path: data.MARSA_REGISTRY_URL
-          value: http://marsa-registry:5000
+          value: http://marsa-registry.NAMESPACE.svc.cluster.local:5000
 
   - it: hands the api both registry passwords from the generated Secret
     template: deployment.yml
@@ -139,3 +147,21 @@ tests:
             name: MARSA_REGISTRY_PULL_PASSWORD
             valueFrom:
               secretKeyRef: { name: marsa-registry-secrets, key: PULL_PASSWORD }
+
+  - it: gives build Jobs a push credential for the in-cluster registry service
+    template: registry-secrets.yml
+    release:
+      namespace: marsa
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-push
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: marsa-builds
+      - equal:
+          path: type
+          value: kubernetes.io/dockerconfigjson
+      - matchRegex:
+          path: stringData[".dockerconfigjson"]
+          pattern: '"marsa-registry\.marsa\.svc\.cluster\.local:5000":\{"username":"marsa-push"'
