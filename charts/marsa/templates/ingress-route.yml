@@ -18,11 +18,6 @@ spec:
     services:
     - name: marsa-api
       port: 3000
-  - match: Host(`registry.{{ . }}`)
-    kind: Rule
-    services:
-    - name: marsa-registry
-      port: 5000
   {{- end }}
   - match: PathPrefix(`/`)
     kind: Rule
@@ -32,4 +27,25 @@ spec:
 {{- if .Values.tls.enabled }}
   tls:
     certResolver: le
+{{- end }}
+{{- with .Values.tls.domain }}
+---
+# Pull-only and HTTPS-only: nodes pull here, pushes stay on the in-cluster Service.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: marsa-registry
+spec:
+  entryPoints:
+    - websecure
+  routes:
+  - match: Host(`registry.{{ . }}`) && (Method(`GET`) || Method(`HEAD`))
+    kind: Rule
+    services:
+    - name: marsa-registry
+      port: 5000
+{{- if $.Values.tls.enabled }}
+  tls:
+    certResolver: le
+{{- end }}
 {{- end }}

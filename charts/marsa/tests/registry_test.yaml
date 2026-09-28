@@ -102,17 +102,53 @@ tests:
           path: spec.ports[0].port
           value: 5000
 
-  - it: routes registry.<domain> to the registry
+  - it: routes only pulls on registry.<domain>, over HTTPS, to the registry
     template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry
     asserts:
-      - contains:
+      - equal:
+          path: spec.entryPoints
+          value: [websecure]
+      - equal:
           path: spec.routes
-          content:
-            match: Host(`registry.example.com`)
-            kind: Rule
-            services:
-              - name: marsa-registry
-                port: 5000
+          value:
+            - match: Host(`registry.example.com`) && (Method(`GET`) || Method(`HEAD`))
+              kind: Rule
+              services:
+                - name: marsa-registry
+                  port: 5000
+      - equal:
+          path: spec.tls.certResolver
+          value: le
+
+  - it: serves the registry route on the default cert when TLS is disabled
+    template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry
+    set:
+      tls.enabled: false
+    asserts:
+      - notExists:
+          path: spec.tls
+
+  - it: keeps the registry host off the main route, which also serves plain HTTP
+    template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-ingress-route
+    asserts:
+      - notMatchRegex:
+          path: spec.routes[0].match
+          pattern: registry
+      - notMatchRegex:
+          path: spec.routes[1].match
+          pattern: registry
+      - lengthEqual:
+          path: spec.routes
+          count: 3
 
   - it: tells the api the public pull host and the in-cluster url
     template: configmap.yml

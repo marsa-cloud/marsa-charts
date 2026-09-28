@@ -5,10 +5,12 @@ Access the app at:
 
   Web UI:  {{ $scheme }}://{{ .Values.tls.domain }}
   API:     {{ $scheme }}://api.{{ .Values.tls.domain }}
+  Images:  https://registry.{{ .Values.tls.domain }}  (nodes pull built app images here)
 
 No DNS yet? The web UI is reachable directly by node IP — a catch-all route
-serves marsa-web on any host. The API and the api.<domain> route are host-based,
-so those need the hostnames below to resolve.
+serves marsa-web on any host. The api.<domain> and registry.<domain> routes are
+host-based, so those need the hostnames below to resolve — from every node too,
+since nodes pull deployed apps' images from registry.<domain>.
 
 Find the node IP:
 
@@ -16,10 +18,10 @@ Find the node IP:
 
   http://<node-ip>/                  # web UI works by raw IP
 
-For the full domain experience (and the API), point a DNS A record at that IP,
-or for a quick local test add to /etc/hosts:
+For the full domain experience (the API and app deploys), point DNS A records at
+that IP, or for a quick local test add to /etc/hosts (on every node as well):
 
-  <node-ip>  {{ .Values.tls.domain }}  api.{{ .Values.tls.domain }}
+  <node-ip>  {{ .Values.tls.domain }}  api.{{ .Values.tls.domain }}  registry.{{ .Values.tls.domain }}
 
 {{- if .Values.tls.enabled }}
 
@@ -27,6 +29,12 @@ TLS is enabled via Let's Encrypt (Traefik ACME resolver). The cert can take up t
 a minute to issue on first request — a browser warning before then is expected.
 Note: Let's Encrypt validates over the public domain, so a /etc/hosts entry alone
 won't get you a trusted cert (use it only for plain-HTTP testing).
+{{- else }}
+
+TLS is disabled, so registry.{{ .Values.tls.domain }} serves Traefik's self-signed
+default cert. Nodes can't pull deployed apps' images until each node trusts it:
+on k3s, add registry.{{ .Values.tls.domain }} with `insecure_skip_verify: true` to
+/etc/rancher/k3s/registries.yaml and restart k3s.
 {{- end }}
 
 Check the rollout:
