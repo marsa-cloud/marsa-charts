@@ -1,0 +1,203 @@
+suite: registry
+templates:
+  - registry-secrets.yml
+  - registry.yml
+  - ingress-route.yml
+  - configmap.yml
+  - deployment.yml
+set:
+  email: a@b.com
+  tls.enabled: true
+  tls.domain: example.com
+tests:
+  - it: generates a push and a pull password
+    template: registry-secrets.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-secrets
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-registry-secrets
+      - matchRegex:
+          path: stringData.PUSH_PASSWORD
+          pattern: "^[A-Za-z0-9]{32}$"
+      - matchRegex:
+          path: stringData.PULL_PASSWORD
+          pattern: "^[A-Za-z0-9]{32}$"
+
+  - it: writes a bcrypt htpasswd entry for each fixed user
+    template: registry-secrets.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-secrets
+    asserts:
+      - matchRegex:
+          path: stringData.htpasswd
+          pattern: "(?m)^marsa-push:\\$2[aby]\\$"
+      - matchRegex:
+          path: stringData.htpasswd
+          pattern: "(?m)^marsa-pull:\\$2[aby]\\$"
+
+  - it: keeps the configured number of most recently pushed tags
+    template: registry.yml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    set:
+      registry.keepImages: 3
+    asserts:
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '"mostRecentlyPushedCount": 3'
+
+  - it: gives marsa-pull read only and marsa-push full access
+    template: registry.yml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '\{ "users": \["marsa-pull"\], "actions": \["read"\] \}'
+      - matchRegex:
+          path: data["config.json"]
+          pattern: '\{ "users": \["marsa-push"\], "actions": \["read", "create", "update", "delete"\] \}'
+
+  - it: runs the pinned zot-minimal image with health probes and a memory cap
+    template: registry.yml
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/project-zot/zot-minimal:v2.1.21
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value: { path: /readyz, port: 5000 }
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value: { path: /livez, port: 5000 }
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 256Mi
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: GOMEMLIMIT, value: 200MiB }
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 10Gi
+
+  - it: exposes the registry in-cluster on port 5000
+    template: registry.yml
+    documentSelector:
+      path: kind
+      value: Service
+    asserts:
+      - equal:
+          path: metadata.name
+          value: marsa-registry
+      - equal:
+          path: spec.ports[0].port
+          value: 5000
+
+  - it: routes only pulls on registry.<domain>, over HTTPS, to the registry
+    template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry
+    asserts:
+      - equal:
+          path: spec.entryPoints
+          value: [websecure]
+      - equal:
+          path: spec.routes
+          value:
+            - match: Host(`registry.example.com`) && (Method(`GET`) || Method(`HEAD`))
+              kind: Rule
+              services:
+                - name: marsa-registry
+                  port: 5000
+      - equal:
+          path: spec.tls.certResolver
+          value: le
+
+  - it: serves the registry route on the default cert when TLS is disabled
+    template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry
+    set:
+      tls.enabled: false
+    asserts:
+      - notExists:
+          path: spec.tls
+
+  - it: keeps the registry host off the main route, which also serves plain HTTP
+    template: ingress-route.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-ingress-route
+    asserts:
+      - notMatchRegex:
+          path: spec.routes[0].match
+          pattern: registry
+      - notMatchRegex:
+          path: spec.routes[1].match
+          pattern: registry
+      - lengthEqual:
+          path: spec.routes
+          count: 3
+
+  - it: tells the api the public pull host and the in-cluster url
+    template: configmap.yml
+    release:
+      namespace: NAMESPACE
+    documentSelector:
+      path: metadata.name
+      value: marsa-config
+    asserts:
+      - equal:
+          path: data.MARSA_REGISTRY_HOST
+          value: registry.example.com
+      - equal:
+          path: data.MARSA_REGISTRY_URL
+          value: http://marsa-registry.NAMESPACE.svc.cluster.local:5000
+
+  - it: hands the api both registry passwords from the generated Secret
+    template: deployment.yml
+    documentSelector:
+      path: metadata.name
+      value: marsa-api
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_REGISTRY_PUSH_PASSWORD
+            valueFrom:
+              secretKeyRef: { name: marsa-registry-secrets, key: PUSH_PASSWORD }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MARSA_REGISTRY_PULL_PASSWORD
+            valueFrom:
+              secretKeyRef: { name: marsa-registry-secrets, key: PULL_PASSWORD }
+
+  - it: gives build Jobs a push credential for the in-cluster registry service
+    template: registry-secrets.yml
+    release:
+      namespace: marsa
+    documentSelector:
+      path: metadata.name
+      value: marsa-registry-push
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: marsa-builds
+      - equal:
+          path: type
+          value: kubernetes.io/dockerconfigjson
+      - matchRegex:
+          path: stringData[".dockerconfigjson"]
+          pattern: '"marsa-registry\.marsa\.svc\.cluster\.local:5000":\{"username":"marsa-push"'

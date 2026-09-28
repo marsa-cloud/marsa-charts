@@ -24,3 +24,7 @@ data:
   # Scheme-less on purpose: the api builds `<slug>.<domain>` app hosts and
   # prepends https:// itself, and Joi validates this as a bare hostname.
   MARSA_BASE_DOMAIN: "{{ .Values.tls.domain }}"
+  # Nodes pull built images by this public name; pods push to the Service's full name so the
+  # build namespace can resolve it.
+  MARSA_REGISTRY_HOST: "registry.{{ .Values.tls.domain }}"
+  MARSA_REGISTRY_URL: "http://marsa-registry.{{ .Release.Namespace }}.svc.cluster.local:5000"

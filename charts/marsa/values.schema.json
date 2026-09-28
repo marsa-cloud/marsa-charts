@@ -4,7 +4,7 @@
   "description": "Value surface for the Marsa umbrella chart. Bundled-component MVP (Postgres only) per AgDR-0004; public-ingress TLS via Traefik ACME resolver per AgDR-0005. additionalProperties is false at every level so off-happy-path keys (e.g. externalDatabase.host) fail loudly instead of being silently ignored.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["email", "image", "postgres", "tls"],
+  "required": ["email", "image", "postgres", "registry", "tls"],
   "properties": {
     "image": {
       "type": "object",
@@ -44,6 +44,29 @@
           "type": "string",
           "description": "PVC size for the Postgres data volume (Kubernetes quantity, e.g. 2Gi). Immutable after first install — changing it makes helm upgrade fail rather than lose data.",
           "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$"
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imageTag", "keepImages", "storageSize"],
+      "description": "In-cluster Zot image registry that build Jobs push to and nodes pull from (#78).",
+      "properties": {
+        "imageTag": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$",
+          "description": "Tag of ghcr.io/project-zot/zot-minimal."
+        },
+        "keepImages": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Most recently pushed tags kept per app repository; older ones are deleted and their layers reclaimed. Rolling back past this many builds fails at image pull."
+        },
+        "storageSize": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$",
+          "description": "PVC size for registry storage. Immutable after first install."
         }
       }
     },

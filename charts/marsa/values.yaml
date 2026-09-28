@@ -17,3 +17,8 @@ postgres:
 tls:
   enabled: true
   domain: "marsa.gomaa.ovh"
+registry:
+  imageTag: "v2.1.21"
+  # Zot deletes older tags beyond this count per app, then reclaims their layers online.
+  keepImages: 10
+  storageSize: "10Gi"

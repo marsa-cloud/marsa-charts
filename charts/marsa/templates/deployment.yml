@@ -75,6 +75,16 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: MARSA_REGISTRY_PUSH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: marsa-registry-secrets
+              key: PUSH_PASSWORD
+        - name: MARSA_REGISTRY_PULL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: marsa-registry-secrets
+              key: PULL_PASSWORD
         startupProbe:
           httpGet:
             path: /api/v1/status
