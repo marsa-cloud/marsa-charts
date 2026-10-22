@@ -58,7 +58,7 @@ The v0.1 chart deliberately does **not** support these. They are deferred to a l
 - **Multi-node / multi-AZ** — uses `local-path` storage class which is node-local
 - **Public-internet-facing deployments** — not validated
 
-See [AgDR-0004 in apexyard](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0004-subchart-policy.md) for the full anti-scope rationale and revisit triggers.
+See [AgDR-0004](docs/agdr/AgDR-0004-subchart-policy.md) for the full anti-scope rationale and revisit triggers.
 
 ## Versioning
 
@@ -69,7 +69,7 @@ This repo follows the [Helm community standard](https://helm.sh/docs/topics/char
 
 A chart-only fix (template typo, default value tweak) bumps `version` only. A new marsa release bumps `appVersion` + default image tags + the chart `version` accordingly.
 
-See [AgDR-0002 in apexyard](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0002-chart-versioning.md) for the policy details.
+See [AgDR-0002](docs/agdr/AgDR-0002-chart-versioning.md) for the policy details.
 
 ## Contributing
 
@@ -90,18 +90,19 @@ helm template marsa charts/marsa | kubeconform -strict -kubernetes-version 1.32.
 
 Pull requests run [`chart-ci.yml`](.github/workflows/chart-ci.yml): `helm lint`, `ct lint`, `kubeconform` against k8s 1.32, plus a `gitleaks` secrets scan on every push. Chart-specific jobs skip cleanly until the first `Chart.yaml` lands under `charts/`.
 
-PR titles must match the conventional commit format `type(#ISSUE): description` — enforced by [`pr-title-check.yml`](.github/workflows/pr-title-check.yml).
-
 ## Decisions
 
-Architectural decisions for this repo are tracked as [Agent Decision Records (AgDRs)](https://github.com/marsa-cloud/apexyard/tree/main/projects/marsa-charts/docs/agdr) in the [`marsa-cloud/apexyard`](https://github.com/marsa-cloud/apexyard) ops repo. Current set:
+Architectural decisions for this repo are tracked as [Agent Decision Records (AgDRs)](docs/agdr/). Current set:
 
 | AgDR | Decision |
 |------|----------|
-| [0001](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0001-chart-structure.md) | Single umbrella chart at `charts/marsa/` |
-| [0002](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0002-chart-versioning.md) | Chart `version` is independent SemVer; `appVersion` tracks marsa |
-| [0003](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0003-chart-distribution.md) | Publish as OCI artifacts to `ghcr.io/marsa-cloud/charts` |
-| [0004](https://github.com/marsa-cloud/apexyard/blob/main/projects/marsa-charts/docs/agdr/AgDR-0004-subchart-policy.md) | v0.1 bundles Postgres + Redis, no BYO axis, K3s Traefik, no cert-manager |
+| [0001](docs/agdr/AgDR-0001-chart-structure.md) | Single umbrella chart at `charts/marsa/` |
+| [0002](docs/agdr/AgDR-0002-chart-versioning.md) | Chart `version` is independent SemVer; `appVersion` tracks marsa |
+| [0003](docs/agdr/AgDR-0003-chart-distribution.md) | Publish as OCI artifacts to `ghcr.io/marsa-cloud/charts` |
+| [0004](docs/agdr/AgDR-0004-subchart-policy.md) | v0.1 bundles Postgres + Redis, no BYO axis, K3s Traefik, no cert-manager |
+| [0005](docs/agdr/AgDR-0005-public-ingress-tls.md) | Public HTTPS via K3s Traefik's built-in ACME resolver, not cert-manager |
+| [0006](docs/agdr/AgDR-0006-ci-tooling.md) | CI runs helm-unittest via its docker image and gitleaks via its OSS binary |
+| [0007](docs/agdr/AgDR-0007-marsa-api-rbac.md) | marsa-api gets a dedicated ServiceAccount + broad namespace-scoped Role |
 
 ## License
 
