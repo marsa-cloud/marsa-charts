@@ -20,7 +20,7 @@ tests:
           path: metadata.labels["pod-security.kubernetes.io/enforce"]
           value: privileged
 
-  - it: lets marsa-api run and watch Jobs and read their pods and logs in marsa-builds only
+  - it: lets marsa-api run Jobs, read their logs and stop their pods in marsa-builds only
     documentSelector:
       path: kind
       value: Role
@@ -44,8 +44,14 @@ tests:
           path: rules
           content:
             apiGroups: [""]
-            resources: ["pods", "pods/log"]
-            verbs: ["get", "list", "watch"]
+            resources: ["pods"]
+            verbs: ["get", "list", "watch", "delete"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["pods/log"]
+            verbs: ["get"]
 
   - it: binds the role to the marsa-api service account of the release namespace
     documentSelector:
