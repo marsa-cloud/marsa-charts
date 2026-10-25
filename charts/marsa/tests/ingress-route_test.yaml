@@ -1,0 +1,22 @@
+suite: ingress-route
+templates:
+  - ingress-route.yml
+set:
+  email: a@b.com
+  tls.enabled: true
+  tls.domain: example.com
+tests:
+  - it: routes only the web and api hosts, so an unknown app host gets a 404
+    documentSelector:
+      path: metadata.name
+      value: marsa-ingress-route
+    asserts:
+      - lengthEqual:
+          path: spec.routes
+          count: 2
+      - equal:
+          path: spec.routes[0].match
+          value: Host(`example.com`)
+      - equal:
+          path: spec.routes[1].match
+          value: Host(`api.example.com`)

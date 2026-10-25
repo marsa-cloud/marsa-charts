@@ -148,7 +148,7 @@ tests:
           pattern: registry
       - lengthEqual:
           path: spec.routes
-          count: 3
+          count: 2
 
   - it: tells the api the public pull host and the in-cluster url
     template: configmap.yml
